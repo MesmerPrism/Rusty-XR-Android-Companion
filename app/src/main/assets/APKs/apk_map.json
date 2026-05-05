@@ -1,0 +1,8 @@
+{
+  "apks": [
+    {
+      "file": "sample-quest-app.apk",
+      "packageId": "com.example.questsample"
+    }
+  ]
+}

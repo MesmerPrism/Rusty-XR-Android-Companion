@@ -1,0 +1,16 @@
+{
+  "defaultPackageIds": [
+    "com.example.questsample"
+  ],
+  "profiles": [
+    {
+      "id": "runtime-default",
+      "label": "Runtime Defaults",
+      "file": "runtime-default.csv",
+      "version": "1.0",
+      "channel": "sample",
+      "studyLock": false,
+      "description": "Example runtime preset payload for a Quest package."
+    }
+  ]
+}

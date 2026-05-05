@@ -1,0 +1,40 @@
+{
+  "apps": [
+    {
+      "id": "sample-quest-app",
+      "label": "Sample Quest App",
+      "packageId": "com.example.questsample",
+      "apkFile": "sample-quest-app.apk",
+      "launchComponent": "",
+      "browserPackageId": "com.oculus.browser",
+      "description": "Example staged app entry for the Quest-first library manifest.",
+      "tags": [
+        "sample"
+      ]
+    },
+    {
+      "id": "quest-browser",
+      "label": "Quest Browser",
+      "packageId": "com.oculus.browser",
+      "apkFile": "quest-browser-placeholder.apk",
+      "launchComponent": "",
+      "browserPackageId": "com.oculus.browser",
+      "description": "Example browser target used for URL open and close controls.",
+      "tags": [
+        "browser",
+        "sample"
+      ]
+    }
+  ],
+  "bundles": [
+    {
+      "id": "sample-stack",
+      "label": "Sample Stack",
+      "description": "Example ordered install bundle.",
+      "appIds": [
+        "quest-browser",
+        "sample-quest-app"
+      ]
+    }
+  ]
+}

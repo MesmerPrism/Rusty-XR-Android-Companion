@@ -1,0 +1,22 @@
+{
+  "profiles": [
+    {
+      "id": "debug-balanced",
+      "label": "Debug Balanced",
+      "description": "Safe sample preset that writes app-specific debug properties only.",
+      "props": {
+        "debug.rustyxrcompanion.profile": "balanced",
+        "debug.rustyxrcompanion.monitor": "enabled"
+      }
+    },
+    {
+      "id": "debug-perf",
+      "label": "Debug Perf",
+      "description": "Safe sample preset for testing write and verify flows without touching system tuning knobs.",
+      "props": {
+        "debug.rustyxrcompanion.profile": "perf",
+        "debug.rustyxrcompanion.monitor": "elevated"
+      }
+    }
+  ]
+}

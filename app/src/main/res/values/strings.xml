@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Rusty XR Companion</string>
+    <string name="service_channel_name">Rusty XR Companion Background</string>
+    <string name="service_channel_description">Keeps Rusty XR Companion transport and diagnostics alive in the background.</string>
+    <string name="service_notification_title">Rusty XR Companion</string>
+    <string name="service_notification_text">Background service active for Quest transport and diagnostics.</string>
+</resources>

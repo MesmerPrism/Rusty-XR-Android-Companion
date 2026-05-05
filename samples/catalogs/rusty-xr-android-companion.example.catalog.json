@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "rusty.xr.quest-app-catalog.v1",
+  "apps": [
+    {
+      "id": "rusty-xr-quest-minimal",
+      "label": "Rusty XR Minimal Quest APK",
+      "packageName": "com.example.rustyxr.minimal",
+      "activityName": ".MainActivity",
+      "apkFile": "rusty-xr-quest-minimal-debug.apk",
+      "description": "Public Rusty XR smoke-test APK metadata. Stage the APK on the phone before installing."
+    },
+    {
+      "id": "rusty-xr-quest-composite-layer",
+      "label": "Rusty XR Quest Composite Layer",
+      "packageName": "com.example.rustyxr.composite",
+      "activityName": ".CompositeLayerActivity",
+      "apkFile": "rusty-xr-quest-composite-layer-debug.apk",
+      "description": "Public immersive Quest example metadata for renderer, camera, OSC, and diagnostics verification."
+    },
+    {
+      "id": "rusty-xr-quest-broker",
+      "label": "Rusty XR Quest Broker",
+      "packageName": "com.example.rustyxr.broker",
+      "activityName": ".MainActivity",
+      "apkFile": "rusty-xr-quest-broker-debug.apk",
+      "description": "Public broker proof-of-concept metadata for localhost WebSocket, OSC ingress, and optional LSL forwarding."
+    },
+    {
+      "id": "example-user-apk",
+      "label": "User supplied Quest APK",
+      "packageName": "com.example.questapp",
+      "activityName": null,
+      "apkFile": null,
+      "description": "Placeholder target. Replace this metadata with a staged APK entry for a local app."
+    }
+  ],
+  "bundles": [
+    {
+      "id": "rusty-xr-core-examples",
+      "label": "Rusty XR Core Examples",
+      "description": "Install the public Rusty XR Quest examples that are staged on the phone.",
+      "appIds": [
+        "rusty-xr-quest-minimal",
+        "rusty-xr-quest-composite-layer",
+        "rusty-xr-quest-broker"
+      ]
+    }
+  ],
+  "deviceProfiles": [
+    {
+      "id": "balanced-dev",
+      "label": "Balanced development",
+      "properties": [
+        {
+          "key": "debug.oculus.cpuLevel",
+          "value": "2"
+        },
+        {
+          "key": "debug.oculus.gpuLevel",
+          "value": "2"
+        }
+      ],
+      "description": "Generic development profile for moderate thermal load."
+    },
+    {
+      "id": "perf-smoke-test",
+      "label": "Performance smoke test",
+      "properties": [
+        {
+          "key": "debug.oculus.cpuLevel",
+          "value": "3"
+        },
+        {
+          "key": "debug.oculus.gpuLevel",
+          "value": "3"
+        }
+      ],
+      "description": "Short verification profile for launch and frame-callback checks."
+    }
+  ],
+  "runtimeProfiles": [
+    {
+      "id": "minimal-contract-log",
+      "label": "Minimal contract log",
+      "values": {
+        "rustyxr.example": "quest-minimal-apk",
+        "rustyxr.contracts": "synthetic"
+      },
+      "description": "Launches the minimal APK with synthetic Rusty XR contract logging enabled."
+    },
+    {
+      "id": "synthetic-composite-layer",
+      "label": "Synthetic layer smoke test",
+      "values": {
+        "rustyxr.example": "quest-composite-layer-apk",
+        "rustyxr.cameraTier": "synthetic",
+        "rustyxr.camera": "false",
+        "rustyxr.mediaProjection": "false",
+        "rustyxr.source": "synthetic",
+        "rustyxr.depth": "off"
+      },
+      "description": "Runs the composite-layer example without camera or screen capture for lifecycle isolation."
+    },
+    {
+      "id": "osc-udp-listener",
+      "label": "OSC UDP listener",
+      "values": {
+        "rustyxr.example": "quest-composite-layer-apk",
+        "rustyxr.cameraTier": "synthetic",
+        "rustyxr.camera": "false",
+        "rustyxr.mediaProjection": "false",
+        "rustyxr.source": "osc-udp",
+        "rustyxr.depth": "off",
+        "rustyxr.oscEnabled": "true",
+        "rustyxr.diagnosticHudVisible": "true",
+        "rustyxr.oscListenAddr": "0.0.0.0:9000",
+        "rustyxr.oscMaxPacketBytes": "8192"
+      },
+      "description": "Starts a generic OSC UDP listener and headset diagnostics HUD for phone-to-headset transport checks."
+    },
+    {
+      "id": "broker-osc-drive-ingress",
+      "label": "Broker OSC drive ingress",
+      "values": {
+        "rustyxr.example": "quest-broker-apk",
+        "rustyxr.brokerEndpoint": "ws://127.0.0.1:8765/rustyxr/v1/events",
+        "rustyxr.oscEnabled": "false",
+        "rustyxr.oscIngressEnabled": "true",
+        "rustyxr.oscIngressPort": "9000",
+        "rustyxr.oscIngressAddress": "/rusty-xr/drive/radius"
+      },
+      "description": "Starts broker-side OSC ingress and rebroadcasts accepted values to localhost WebSocket clients."
+    }
+  ]
+}

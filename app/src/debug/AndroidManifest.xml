@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name=".debug.DebugPolarScanActivity"
+            android:exported="true"
+            android:theme="@style/Theme.RustyXrCompanion">
+            <intent-filter>
+                <action android:name="io.github.mesmerprism.rustyxr.companion.android.DEBUG_POLAR_SCAN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".debug.DebugQuestTransportSuiteActivity"
+            android:exported="true"
+            android:theme="@style/Theme.RustyXrCompanion">
+            <intent-filter>
+                <action android:name="io.github.mesmerprism.rustyxr.companion.android.DEBUG_QUEST_TRANSPORT_SUITE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
