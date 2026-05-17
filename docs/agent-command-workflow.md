@@ -44,6 +44,10 @@ instability that does not affect the individual workflow steps.
 
 - `polar-pmd-smoke`: scan/connect to a Polar H10, start PMD ECG and ACC, and
   report decoded frame/sample counts.
+- `q2q-relay`: run a bounded phone-native Rusty XR Q2Q relay test as sender,
+  receiver, or duplex. The sender path emits synthetic H.264 `RXYRVID1` packets
+  from Android `MediaCodec`; the receiver path validates and counts incoming
+  `RXYRVID1` H.264 packets.
 - `quest-suite`: connect to the Quest, wake it, optionally
   install/launch/query/stop a target app, send home/back, then run non-critical
   package inventory and OSC UDP probes.
@@ -72,6 +76,23 @@ adb -s <phone-serial> shell am start `
   -n io.github.mesmerprism.rustyxr.companion.android/.agent.AgentCommandActivity `
   --es command polar-pmd-smoke `
   --el timeout_ms 45000
+```
+
+Q2Q relay duplex:
+
+```powershell
+adb -s <phone-serial> shell am start `
+  -a io.github.mesmerprism.rustyxr.companion.android.RUN_AGENT_COMMAND `
+  -n io.github.mesmerprism.rustyxr.companion.android/.agent.AgentCommandActivity `
+  --es command q2q-relay `
+  --es q2q_mode duplex `
+  --es relay_host <relay-host> `
+  --ei relay_port 9443 `
+  --es relay_token <shared-token> `
+  --es send_session_id <phone-to-quest-session> `
+  --es receive_session_id <quest-to-phone-session> `
+  --es eyes left,right `
+  --ei duration_ms 30000
 ```
 
 Install a staged APK:

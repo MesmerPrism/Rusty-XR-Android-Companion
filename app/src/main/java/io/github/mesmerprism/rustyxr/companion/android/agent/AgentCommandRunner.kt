@@ -13,6 +13,8 @@ import io.github.mesmerprism.rustyxr.companion.android.transport.PolarPmdControl
 import io.github.mesmerprism.rustyxr.companion.android.transport.PolarPmdEcgFrameSummary
 import io.github.mesmerprism.rustyxr.companion.android.transport.PolarPmdSettingsSummary
 import io.github.mesmerprism.rustyxr.companion.android.transport.PolarPmdSmokeResult
+import io.github.mesmerprism.rustyxr.companion.android.transport.Q2QRelayRequest
+import io.github.mesmerprism.rustyxr.companion.android.transport.Q2QRelayTransport
 import io.github.mesmerprism.rustyxr.companion.android.transport.TransportKind
 import io.github.mesmerprism.rustyxr.companion.android.transport.TransportResult
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +37,7 @@ class AgentCommandRunner(
         val startedAt = Instant.now()
         val result = when (command) {
             CommandPolarPmdSmoke -> runPolarPmdSmoke(intent, startedAt)
+            CommandQ2QRelay -> runQ2QRelay(intent, startedAt)
             CommandQuestSuite -> runQuestSuite(intent, startedAt)
             CommandQuestInspectUsb -> runQuestUsbTransportCommand(startedAt, "inspect-usb")
             CommandQuestProbeUsb -> runQuestUsbTransportCommand(startedAt, "probe-usb")
@@ -73,6 +76,51 @@ class AgentCommandRunner(
             put("startedAtUtc", startedAt.toString())
             put("endedAtUtc", Instant.now().toString())
             put("polar", result.toJson())
+        }
+    }
+
+    private suspend fun runQ2QRelay(intent: Intent, startedAt: Instant): JSONObject {
+        val mode = intent.requiredStringOrNull(ExtraQ2QMode)
+            ?: intent.requiredStringOrNull(ExtraMode)
+            ?: DefaultQ2QMode
+        val sessionId = intent.requiredStringOrNull(ExtraSessionId)
+        val sendSessionId = intent.requiredStringOrNull(ExtraSendSessionId)
+            ?: sessionId
+            ?: DefaultQ2QSendSessionId
+        val receiveSessionId = intent.requiredStringOrNull(ExtraReceiveSessionId)
+            ?: sessionId
+            ?: DefaultQ2QReceiveSessionId
+        val request = Q2QRelayRequest(
+            mode = mode,
+            relayHost = intent.requiredStringOrNull(ExtraRelayHost) ?: DefaultQ2QRelayHost,
+            relayPort = intent.getIntExtra(ExtraRelayPort, DefaultQ2QRelayPort).coerceIn(1, 65_535),
+            token = intent.getStringExtra(ExtraRelayToken)?.trim().orEmpty(),
+            tls = intent.getBooleanExtra(ExtraRelayTls, false),
+            insecureTls = intent.getBooleanExtra(ExtraRelayInsecureTls, false),
+            serverName = intent.getStringExtra(ExtraRelayServerName)?.trim().orEmpty(),
+            sendSessionId = sendSessionId,
+            receiveSessionId = receiveSessionId,
+            eyes = parseEyes(intent.requiredStringOrNull(ExtraEyes)),
+            durationMs = intent.getIntExtra(ExtraDurationMs, DefaultQ2QDurationMs)
+                .coerceIn(MinQ2QDurationMs, MaxQ2QDurationMs),
+            connectTimeoutMs = intent.getIntExtra(ExtraConnectTimeoutMs, DefaultQ2QConnectTimeoutMs)
+                .coerceIn(MinQ2QConnectTimeoutMs, MaxQ2QConnectTimeoutMs),
+            width = intent.getIntExtra(ExtraWidth, DefaultQ2QWidth).coerceIn(160, 1920),
+            height = intent.getIntExtra(ExtraHeight, DefaultQ2QHeight).coerceIn(120, 1080),
+            bitrateBps = intent.getIntExtra(ExtraBitrateBps, DefaultQ2QBitrateBps)
+                .coerceIn(100_000, 10_000_000),
+            frameRateHz = intent.getIntExtra(ExtraFrameRateHz, DefaultQ2QFrameRateHz)
+                .coerceIn(1, 60),
+            label = intent.getStringExtra(ExtraLabel)?.trim().orEmpty()
+        )
+        val q2q = Q2QRelayTransport().run(request)
+        return JSONObject().apply {
+            put("schemaVersion", SchemaVersion)
+            put("command", CommandQ2QRelay)
+            put("overall", q2q.optString("overall", "failed"))
+            put("startedAtUtc", startedAt.toString())
+            put("endedAtUtc", Instant.now().toString())
+            put("q2qRelay", q2q)
         }
     }
 
@@ -321,6 +369,30 @@ class AgentCommandRunner(
             .associateWith { key -> json.opt(key)?.toString().orEmpty() }
     }
 
+    private fun parseEyes(raw: String?): List<String> {
+        val eyes = ArrayList<String>()
+        fun add(value: String) {
+            when (value.trim().lowercase(Locale.US)) {
+                "left", "l" -> if (!eyes.contains("left")) eyes.add("left")
+                "right", "r" -> if (!eyes.contains("right")) eyes.add("right")
+                "mono", "m" -> if (!eyes.contains("mono")) eyes.add("mono")
+                "both", "stereo" -> {
+                    add("left")
+                    add("right")
+                }
+            }
+        }
+        raw.orEmpty()
+            .split(",", ";", " ")
+            .filter { it.isNotBlank() }
+            .forEach { add(it) }
+        if (eyes.isEmpty()) {
+            add("left")
+            add("right")
+        }
+        return eyes
+    }
+
     private fun parseUtility(value: String): AdbUtility {
         return when (value.trim().lowercase(Locale.US)) {
             "home" -> AdbUtility.Home
@@ -339,14 +411,34 @@ class AgentCommandRunner(
         const val ExtraEndpoint = "endpoint"
         const val ExtraOscPort = "osc_port"
         const val ExtraTimeoutMs = "timeout_ms"
+        const val ExtraDurationMs = "duration_ms"
+        const val ExtraConnectTimeoutMs = "connect_timeout_ms"
         const val ExtraDeviceAddress = "device_address"
         const val ExtraApkFile = "apk_file"
         const val ExtraPackageId = "package_id"
         const val ExtraComponent = "component"
         const val ExtraLaunchExtrasJson = "extras_json"
         const val ExtraUtility = "utility"
+        const val ExtraMode = "mode"
+        const val ExtraQ2QMode = "q2q_mode"
+        const val ExtraSessionId = "session_id"
+        const val ExtraSendSessionId = "send_session_id"
+        const val ExtraReceiveSessionId = "receive_session_id"
+        const val ExtraRelayHost = "relay_host"
+        const val ExtraRelayPort = "relay_port"
+        const val ExtraRelayToken = "relay_token"
+        const val ExtraRelayTls = "relay_tls"
+        const val ExtraRelayInsecureTls = "relay_insecure_tls"
+        const val ExtraRelayServerName = "relay_server_name"
+        const val ExtraEyes = "eyes"
+        const val ExtraWidth = "width"
+        const val ExtraHeight = "height"
+        const val ExtraBitrateBps = "bitrate_bps"
+        const val ExtraFrameRateHz = "frame_rate_hz"
+        const val ExtraLabel = "label"
 
         const val CommandPolarPmdSmoke = "polar-pmd-smoke"
+        const val CommandQ2QRelay = "q2q-relay"
         const val CommandQuestSuite = "quest-suite"
         const val CommandQuestInspectUsb = "quest-inspect-usb"
         const val CommandQuestProbeUsb = "quest-probe-usb"
@@ -365,9 +457,25 @@ class AgentCommandRunner(
         private const val DefaultPolarTimeoutMs = 45_000L
         private const val MinPolarTimeoutMs = 3_000L
         private const val MaxPolarTimeoutMs = 90_000L
+        private const val DefaultQ2QMode = "duplex"
+        private const val DefaultQ2QRelayHost = "127.0.0.1"
+        private const val DefaultQ2QRelayPort = 9443
+        private const val DefaultQ2QSendSessionId = "phone-to-quest"
+        private const val DefaultQ2QReceiveSessionId = "quest-to-phone"
+        private const val DefaultQ2QDurationMs = 15_000
+        private const val MinQ2QDurationMs = 1_000
+        private const val MaxQ2QDurationMs = 120_000
+        private const val DefaultQ2QConnectTimeoutMs = 15_000
+        private const val MinQ2QConnectTimeoutMs = 1_000
+        private const val MaxQ2QConnectTimeoutMs = 60_000
+        private const val DefaultQ2QWidth = 640
+        private const val DefaultQ2QHeight = 480
+        private const val DefaultQ2QBitrateBps = 800_000
+        private const val DefaultQ2QFrameRateHz = 30
 
         private val SupportedCommands = listOf(
             CommandPolarPmdSmoke,
+            CommandQ2QRelay,
             CommandQuestSuite,
             CommandQuestInspectUsb,
             CommandQuestProbeUsb,
