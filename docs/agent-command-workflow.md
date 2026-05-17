@@ -18,6 +18,20 @@ Reports are written to:
 
 `latest.json` always mirrors the newest report.
 
+For relay or smoke runs that keep sockets open for more than a few seconds,
+prepare the phone first so Android doze/background policy does not tear down
+the command sockets while the phone is USB-powered:
+
+```powershell
+.\Tools\prepare-agent-command-phone.ps1 -DeviceSerial <phone-serial> -Mode Prepare
+```
+
+Restore the previous phone power and idle settings after the run:
+
+```powershell
+.\Tools\prepare-agent-command-phone.ps1 -DeviceSerial <phone-serial> -Mode Restore
+```
+
 ## Command Shape
 
 ```powershell
@@ -89,11 +103,17 @@ adb -s <phone-serial> shell am start `
   --es relay_host <relay-host> `
   --ei relay_port 9443 `
   --es relay_token <shared-token> `
+  --ez allow_dev_session true `
   --es send_session_id <phone-to-quest-session> `
   --es receive_session_id <quest-to-phone-session> `
   --es eyes left,right `
   --ei duration_ms 30000
 ```
+
+Follow-up validation target: run the same duplex relay path with real camera
+H.264 payloads after the synthetic duplex path is passing. Keep synthetic
+sender/receiver mode as the fallback diagnostic, then test one camera direction
+before enabling camera payloads in both directions at once.
 
 Install a staged APK:
 

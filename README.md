@@ -12,8 +12,8 @@ catalogs, diagnostics, and release boundaries.
 - Jetpack Compose Android phone UI.
 - Foreground service host for long-running transport actions.
 - Direct ADB protocol over Android USB host and TCP sockets.
-- USB-host Quest bootstrap and authorization flow.
-- Enable Wi-Fi ADB from a phone-to-headset USB connection.
+- USB-host Quest ADB authorization flow after Quest Developer Mode is enabled.
+- Enable Wi-Fi ADB from a trusted phone-to-headset USB ADB connection.
 - Direct Wi-Fi ADB reconnect to `host:5555`.
 - ADB file transfer, streaming `pm install`, package launch, force-stop, URL
   open, foreground query, package listing, and utility key events.
