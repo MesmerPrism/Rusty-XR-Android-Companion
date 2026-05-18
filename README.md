@@ -30,6 +30,8 @@ catalogs, diagnostics, and release boundaries.
 - Polar H10 BLE availability and battery check using Android framework BLE.
 - Agent command workflow for PC-driven Polar ECG/ACC smoke checks and
   phone-to-Quest install/launch/stop commands.
+- Phone-native Q2Q relay command support for synthetic and Camera2 H.264
+  sender/receiver tests, with session-wide timing and live progress JSONL.
 - Diagnostics ZIP export plus a Python analyzer.
 - Optional LSL monitor surface that reports unavailable native runtime when no
   audited Android `liblsl` payload is present.
@@ -165,6 +167,14 @@ The analyzer writes:
 
 - `<stem>_report.md`
 - `<stem>_analysis.json`
+
+Agent command runs also maintain live files under the app-private
+`agent-commands` folder:
+
+- `current.json` for the newest progress event.
+- `latest.json` for the newest final report.
+- `agent_command_<stamp>_<command>.events.jsonl` for command acceptance,
+  relay ACK, camera selection, first packet/frame, and report-write evidence.
 
 ## Streaming And Sensors
 

@@ -1,8 +1,16 @@
 package io.github.mesmerprism.rustyxr.companion.android.agent
 
 import android.app.Activity
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
+import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
+import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.TextView
 import io.github.mesmerprism.rustyxr.companion.android.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +27,11 @@ import java.util.Locale
 
 class AgentCommandActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var commandStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val gate = AgentCommandGate(applicationContext)
         if (BuildConfig.DEBUG && intent.getBooleanExtra(ExtraAllowDevSession, false)) {
@@ -32,7 +42,20 @@ class AgentCommandActivity : Activity() {
         if (!snapshot.active) {
             scope.launch {
                 val command = intent.getStringExtra(AgentCommandRunner.ExtraCommand).orEmpty()
+                val progress = AgentCommandProgressWriter.create(
+                    filesDir = applicationContext.filesDir,
+                    externalFilesDir = getExternalFilesDir(null),
+                    command = command.ifBlank { "denied" }
+                )
+                progress.event(
+                    "command_denied",
+                    JSONObject().apply {
+                        put("active", false)
+                        put("enabledUntilUtc", snapshot.enabledUntilUtc ?: JSONObject.NULL)
+                    }
+                )
                 val report = deniedReport(command, snapshot)
+                report.put("progress", progress.pathsJson())
                 val reportFile = AgentCommandReportWriter(applicationContext.filesDir, getExternalFilesDir(null))
                     .write(command.ifBlank { "denied" }, report)
                 gate.recordReportPath(reportFile.absolutePath)
@@ -42,12 +65,76 @@ class AgentCommandActivity : Activity() {
             return
         }
 
+        if (intent.getBooleanExtra(AgentCommandRunner.ExtraDisplayReceiver, false)) {
+            launchDisplayedCommand()
+            return
+        }
+
+        launchCommand(receiverDisplaySurface = null)
+    }
+
+    private fun launchDisplayedCommand() {
+        val root = FrameLayout(this)
+        val surfaceView = SurfaceView(this)
+        root.addView(
+            surfaceView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        root.addView(
+            TextView(this).apply {
+                setTextColor(Color.WHITE)
+                setBackgroundColor(0x66000000)
+                textSize = 14f
+                text = "Rusty XR Q2Q receiver"
+                setPadding(16, 10, 16, 10)
+            },
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.START
+            )
+        )
+        setContentView(root)
+        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
+            override fun surfaceCreated(holder: SurfaceHolder) {
+                launchCommand(receiverDisplaySurface = holder.surface)
+            }
+
+            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            }
+
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
+            }
+        })
+    }
+
+    private fun launchCommand(receiverDisplaySurface: Surface?) {
+        if (commandStarted) {
+            return
+        }
+        commandStarted = true
         scope.launch {
             val command = intent.getStringExtra(AgentCommandRunner.ExtraCommand)
                 ?.trim()
                 ?.lowercase(Locale.US)
                 .orEmpty()
-            val report = runCatching { AgentCommandRunner(applicationContext).run(intent) }
+            val progress = AgentCommandProgressWriter.create(
+                filesDir = applicationContext.filesDir,
+                externalFilesDir = getExternalFilesDir(null),
+                command = command.ifBlank { "missing" }
+            )
+            progress.event(
+                "command_accepted",
+                JSONObject().apply {
+                    put("displayReceiver", intent.getBooleanExtra(AgentCommandRunner.ExtraDisplayReceiver, false))
+                }
+            )
+            val report = runCatching {
+                AgentCommandRunner(applicationContext, receiverDisplaySurface, progress).run(intent)
+            }
                 .getOrElse { throwable ->
                     JSONObject().apply {
                         put("schemaVersion", "rusty.xr.android-companion.agent-command.v1")
@@ -58,10 +145,23 @@ class AgentCommandActivity : Activity() {
                         put("startedAtUtc", Instant.now().toString())
                         put("endedAtUtc", Instant.now().toString())
                     }
+            }
+            report.put("progress", progress.pathsJson())
+            progress.event(
+                "command_report_ready",
+                JSONObject().apply {
+                    put("overall", report.optString("overall", "unknown"))
                 }
+            )
             val reportFile = AgentCommandReportWriter(applicationContext.filesDir, getExternalFilesDir(null))
                 .write(command.ifBlank { "missing" }, report)
-            gate.recordReportPath(reportFile.absolutePath)
+            AgentCommandGate(applicationContext).recordReportPath(reportFile.absolutePath)
+            progress.event(
+                "command_report_written",
+                JSONObject().apply {
+                    put("report", reportFile.absolutePath)
+                }
+            )
             Log.i(
                 Tag,
                 "Agent command completed. command=$command overall=${report.optString("overall")} report=${reportFile.absolutePath}"

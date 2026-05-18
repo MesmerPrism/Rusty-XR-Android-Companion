@@ -2,6 +2,7 @@ package io.github.mesmerprism.rustyxr.companion.android.agent
 
 import android.content.Context
 import android.content.Intent
+import android.view.Surface
 import io.github.mesmerprism.rustyxr.companion.android.transport.AdbUtility
 import io.github.mesmerprism.rustyxr.companion.android.transport.AndroidPolarPmdSmokeMonitor
 import io.github.mesmerprism.rustyxr.companion.android.transport.LiveAdbTransport
@@ -25,7 +26,9 @@ import java.time.Instant
 import java.util.Locale
 
 class AgentCommandRunner(
-    context: Context
+    context: Context,
+    private val receiverDisplaySurface: Surface? = null,
+    private val progressSink: AgentCommandProgressSink = NoopAgentCommandProgressSink
 ) {
     private val applicationContext = context.applicationContext
 
@@ -83,6 +86,13 @@ class AgentCommandRunner(
         val mode = intent.requiredStringOrNull(ExtraQ2QMode)
             ?: intent.requiredStringOrNull(ExtraMode)
             ?: DefaultQ2QMode
+        val sourceMode = intent.getStringExtra(ExtraSourceMode)?.trim().orEmpty()
+        val normalizedSourceMode = normalizeQ2QSourceMode(sourceMode)
+        val sessionBudgetMs = sessionDurationMs(intent)
+        val durationMs = durationMs(intent, sessionBudgetMs)
+        val connectTimeoutMs = connectTimeoutMs(intent, sessionBudgetMs)
+        val defaultWidth = if (normalizedSourceMode == SourceModeCamera2) DefaultQ2QCameraRequestedWidth else DefaultQ2QSyntheticWidth
+        val defaultHeight = if (normalizedSourceMode == SourceModeCamera2) DefaultQ2QCameraRequestedHeight else DefaultQ2QSyntheticHeight
         val sessionId = intent.requiredStringOrNull(ExtraSessionId)
         val sendSessionId = intent.requiredStringOrNull(ExtraSendSessionId)
             ?: sessionId
@@ -90,10 +100,21 @@ class AgentCommandRunner(
         val receiveSessionId = intent.requiredStringOrNull(ExtraReceiveSessionId)
             ?: sessionId
             ?: DefaultQ2QReceiveSessionId
+        progressSink.event(
+            "q2q_request_building",
+            JSONObject().apply {
+                put("mode", mode)
+                put("sourceMode", normalizedSourceMode)
+                put("sessionBudgetMs", sessionBudgetMs)
+                put("durationMs", durationMs)
+                put("connectTimeoutMs", connectTimeoutMs)
+            }
+        )
         val request = Q2QRelayRequest(
             mode = mode,
             relayHost = intent.requiredStringOrNull(ExtraRelayHost) ?: DefaultQ2QRelayHost,
             relayPort = intent.getIntExtra(ExtraRelayPort, DefaultQ2QRelayPort).coerceIn(1, 65_535),
+            channel = intent.getStringExtra(ExtraRelayChannel)?.trim().orEmpty(),
             token = intent.getStringExtra(ExtraRelayToken)?.trim().orEmpty(),
             tls = intent.getBooleanExtra(ExtraRelayTls, false),
             insecureTls = intent.getBooleanExtra(ExtraRelayInsecureTls, false),
@@ -101,19 +122,46 @@ class AgentCommandRunner(
             sendSessionId = sendSessionId,
             receiveSessionId = receiveSessionId,
             eyes = parseEyes(intent.requiredStringOrNull(ExtraEyes)),
-            durationMs = intent.getIntExtra(ExtraDurationMs, DefaultQ2QDurationMs)
-                .coerceIn(MinQ2QDurationMs, MaxQ2QDurationMs),
-            connectTimeoutMs = intent.getIntExtra(ExtraConnectTimeoutMs, DefaultQ2QConnectTimeoutMs)
-                .coerceIn(MinQ2QConnectTimeoutMs, MaxQ2QConnectTimeoutMs),
-            width = intent.getIntExtra(ExtraWidth, DefaultQ2QWidth).coerceIn(160, 1920),
-            height = intent.getIntExtra(ExtraHeight, DefaultQ2QHeight).coerceIn(120, 1080),
+            durationMs = durationMs,
+            connectTimeoutMs = connectTimeoutMs,
+            width = intent.getIntExtra(ExtraWidth, defaultWidth).coerceIn(0, MaxQ2QDimension),
+            height = intent.getIntExtra(ExtraHeight, defaultHeight).coerceIn(0, MaxQ2QDimension),
             bitrateBps = intent.getIntExtra(ExtraBitrateBps, DefaultQ2QBitrateBps)
-                .coerceIn(100_000, 10_000_000),
+                .coerceIn(100_000, MaxQ2QBitrateBps),
             frameRateHz = intent.getIntExtra(ExtraFrameRateHz, DefaultQ2QFrameRateHz)
                 .coerceIn(1, 60),
+            sourceMode = normalizedSourceMode,
+            cameraId = intent.getStringExtra(ExtraCameraId)?.trim().orEmpty(),
+            cameraFacing = intent.getStringExtra(ExtraCameraFacing)?.trim().orEmpty(),
+            sameCameraToEyes = intent.getBooleanExtra(ExtraSameCameraToEyes, true),
+            qualityProfile = intent.getStringExtra(ExtraQualityProfile)?.trim().orEmpty(),
             label = intent.getStringExtra(ExtraLabel)?.trim().orEmpty()
         )
-        val q2q = Q2QRelayTransport().run(request)
+        progressSink.event(
+            "q2q_request_ready",
+            JSONObject().apply {
+                put("mode", request.mode)
+                put("relayHost", request.relayHost)
+                put("relayPort", request.relayPort)
+                put("channel", request.channel.ifBlank { "media" })
+                put("sendSessionId", request.sendSessionId)
+                put("receiveSessionId", request.receiveSessionId)
+                put("durationMs", request.durationMs)
+                put("connectTimeoutMs", request.connectTimeoutMs)
+                put("sourceMode", request.sourceMode)
+                put("qualityProfile", request.qualityProfile.ifBlank { "camera-native-max" })
+                put("width", request.width)
+                put("height", request.height)
+                put("frameRateHz", request.frameRateHz)
+                put("bitrateBps", request.bitrateBps)
+            }
+        )
+        val q2q = Q2QRelayTransport(
+            applicationContext = applicationContext,
+            receiverDisplaySurface = receiverDisplaySurface,
+            receiverDisplayEye = intent.getStringExtra(ExtraDisplayEye)?.trim().orEmpty(),
+            progressSink = progressSink
+        ).run(request)
         return JSONObject().apply {
             put("schemaVersion", SchemaVersion)
             put("command", CommandQ2QRelay)
@@ -393,6 +441,55 @@ class AgentCommandRunner(
         return eyes
     }
 
+    private fun sessionDurationMs(intent: Intent): Int {
+        val fromMs = if (intent.hasExtra(ExtraSessionDurationMs)) {
+            intent.longExtra(ExtraSessionDurationMs, 0L)
+        } else {
+            null
+        }
+        val fromSeconds = if (intent.hasExtra(ExtraSessionDurationS)) {
+            intent.longExtra(ExtraSessionDurationS, 0L) * 1000L
+        } else {
+            null
+        }
+        val requested = fromMs ?: fromSeconds ?: DefaultQ2QDurationMs.toLong()
+        return requested.coerceIn(0L, MaxQ2QDurationMs.toLong()).toInt()
+    }
+
+    private fun durationMs(intent: Intent, sessionBudgetMs: Int): Int {
+        val requested = if (intent.hasExtra(ExtraDurationMs)) {
+            intent.longExtra(ExtraDurationMs, sessionBudgetMs.toLong())
+        } else {
+            sessionBudgetMs.toLong()
+        }
+        return requested.coerceIn(MinQ2QDurationMs.toLong(), MaxQ2QDurationMs.toLong()).toInt()
+    }
+
+    private fun connectTimeoutMs(intent: Intent, sessionBudgetMs: Int): Int {
+        val requested = if (intent.hasExtra(ExtraConnectTimeoutMs)) {
+            intent.longExtra(ExtraConnectTimeoutMs, sessionBudgetMs.toLong())
+        } else {
+            sessionBudgetMs.toLong()
+        }
+        return requested.coerceIn(MinQ2QConnectTimeoutMs.toLong(), MaxQ2QConnectTimeoutMs.toLong()).toInt()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun Intent.longExtra(extraName: String, defaultValue: Long): Long {
+        val value = extras?.get(extraName) ?: return defaultValue
+        return when (value) {
+            is Number -> value.toLong()
+            is String -> value.toLongOrNull() ?: defaultValue
+            else -> defaultValue
+        }
+    }
+
+    private fun normalizeQ2QSourceMode(value: String): String =
+        when (value.trim().lowercase(Locale.US)) {
+            "camera", "camera2", "phone-camera", "phone_camera", "camera2_surface" -> SourceModeCamera2
+            else -> SourceModeSyntheticSurface
+        }
+
     private fun parseUtility(value: String): AdbUtility {
         return when (value.trim().lowercase(Locale.US)) {
             "home" -> AdbUtility.Home
@@ -430,11 +527,21 @@ class AgentCommandRunner(
         const val ExtraRelayTls = "relay_tls"
         const val ExtraRelayInsecureTls = "relay_insecure_tls"
         const val ExtraRelayServerName = "relay_server_name"
+        const val ExtraRelayChannel = "relay_channel"
+        const val ExtraSessionDurationMs = "session_duration_ms"
+        const val ExtraSessionDurationS = "session_duration_s"
         const val ExtraEyes = "eyes"
         const val ExtraWidth = "width"
         const val ExtraHeight = "height"
         const val ExtraBitrateBps = "bitrate_bps"
         const val ExtraFrameRateHz = "frame_rate_hz"
+        const val ExtraSourceMode = "source_mode"
+        const val ExtraQualityProfile = "quality_profile"
+        const val ExtraCameraId = "camera_id"
+        const val ExtraCameraFacing = "camera_facing"
+        const val ExtraSameCameraToEyes = "same_camera_to_eyes"
+        const val ExtraDisplayReceiver = "display_receiver"
+        const val ExtraDisplayEye = "display_eye"
         const val ExtraLabel = "label"
 
         const val CommandPolarPmdSmoke = "polar-pmd-smoke"
@@ -462,16 +569,21 @@ class AgentCommandRunner(
         private const val DefaultQ2QRelayPort = 9443
         private const val DefaultQ2QSendSessionId = "phone-to-quest"
         private const val DefaultQ2QReceiveSessionId = "quest-to-phone"
-        private const val DefaultQ2QDurationMs = 15_000
-        private const val MinQ2QDurationMs = 1_000
-        private const val MaxQ2QDurationMs = 120_000
-        private const val DefaultQ2QConnectTimeoutMs = 15_000
-        private const val MinQ2QConnectTimeoutMs = 1_000
-        private const val MaxQ2QConnectTimeoutMs = 60_000
-        private const val DefaultQ2QWidth = 640
-        private const val DefaultQ2QHeight = 480
-        private const val DefaultQ2QBitrateBps = 800_000
-        private const val DefaultQ2QFrameRateHz = 30
+        private const val DefaultQ2QDurationMs = 0
+        private const val MinQ2QDurationMs = 0
+        private const val MaxQ2QDurationMs = 6 * 60 * 60 * 1000
+        private const val MinQ2QConnectTimeoutMs = 0
+        private const val MaxQ2QConnectTimeoutMs = 6 * 60 * 60 * 1000
+        private const val DefaultQ2QSyntheticWidth = 1280
+        private const val DefaultQ2QSyntheticHeight = 1280
+        private const val DefaultQ2QCameraRequestedWidth = 0
+        private const val DefaultQ2QCameraRequestedHeight = 0
+        private const val MaxQ2QDimension = 4096
+        private const val DefaultQ2QBitrateBps = 20_000_000
+        private const val MaxQ2QBitrateBps = 50_000_000
+        private const val DefaultQ2QFrameRateHz = 60
+        private const val SourceModeSyntheticSurface = "synthetic_surface"
+        private const val SourceModeCamera2 = "camera2_surface"
 
         private val SupportedCommands = listOf(
             CommandPolarPmdSmoke,
