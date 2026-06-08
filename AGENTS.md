@@ -3,6 +3,11 @@
 This is intended to become a public open-source Android companion repo. Keep
 every committed file public-safe.
 
+Rusty Morphospace is the top-level project/platform umbrella for the clean
+refactor. This Android companion remains a phone-side transport/tooling lane;
+do not rename public Rusty-XR surfaces or make the phone companion a
+Morphospace runtime authority.
+
 ## Public Boundary
 
 Do not commit:
