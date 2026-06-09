@@ -48,6 +48,40 @@ launch. Boolean, integer, long, and float-looking strings use `--ez`, `--ei`,
 `--el`, and `--ef`; other values use `--es`. Profiles with a legacy CSV file
 can still be uploaded as `runtime_overrides.csv`.
 
+## Morphospace Makepad Profiles
+
+Active Morphospace Makepad settings use the canonical
+`rusty.gui.makepad.effective_settings.v1` resolver path from `rusty-makepad`.
+The Android companion does not resolve that surface and should not become a
+second settings authority. Use `rusty-quest-makepad` to build the Quest Makepad
+runtime bundle, then stage the generated property values as a catalog device
+profile when the phone is the launcher.
+
+A catalog device profile can carry generated Quest Makepad property values:
+
+```json
+{
+  "id": "quest-makepad-mesh-replay",
+  "label": "Quest Makepad Mesh Replay",
+  "properties": [
+    {
+      "key": "debug.rustyquest.makepad.mesh.replay.enabled",
+      "value": "true"
+    },
+    {
+      "key": "debug.rustyquest.makepad.render.scale",
+      "value": "0.9"
+    }
+  ]
+}
+```
+
+Apply the device profile before launch. Keep Activity extras for target app
+launch flags only; do not duplicate a `debug.rustyquest.makepad.*` value as an
+extra unless the target app explicitly documents that exact extra. Public
+`rustyxr.*` runtime profile examples remain compatibility examples for Rusty XR
+catalog apps, not the active Makepad settings source of truth.
+
 ## Phone-Local Runtime Profiles
 
 The phone app can store local runtime profiles alongside imported catalog

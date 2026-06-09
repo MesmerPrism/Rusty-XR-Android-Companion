@@ -25,6 +25,8 @@ catalogs, diagnostics, and release boundaries.
 - Phone-local runtime profile authoring and persistence, merged with imported
   catalog profiles.
 - Device property profile application.
+- Public-safe transport for generated Morphospace Makepad device profiles;
+  Makepad settings resolution remains in the active Morphospace Makepad repos.
 - OSC UDP send/listen diagnostics aligned with the Windows companion argument
   vocabulary.
 - Polar H10 BLE availability and battery check using Android framework BLE.

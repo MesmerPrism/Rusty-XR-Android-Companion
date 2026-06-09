@@ -29,6 +29,14 @@ class QuestLibraryManifestParserTest {
                         { "key": "debug.oculus.cpuLevel", "value": "3" },
                         { "key": "debug.oculus.gpuLevel", "value": "3" }
                       ]
+                    },
+                    {
+                      "id": "quest-makepad-mesh-replay",
+                      "label": "Quest Makepad mesh replay",
+                      "properties": [
+                        { "key": "debug.rustyquest.makepad.mesh.replay.enabled", "value": "true" },
+                        { "key": "debug.rustyquest.makepad.render.scale", "value": "0.9" }
+                      ]
                     }
                   ],
                   "runtimeProfiles": [
@@ -53,8 +61,12 @@ class QuestLibraryManifestParserTest {
         assertEquals(1, manifest.apps.size)
         assertEquals("com.example.rustyxr.composite", manifest.apps.first().packageId)
         assertEquals("com.example.rustyxr.composite/.CompositeLayerActivity", manifest.apps.first().launchComponent)
-        assertEquals(1, manifest.deviceProfiles.size)
+        assertEquals(2, manifest.deviceProfiles.size)
         assertEquals("3", manifest.deviceProfiles.first().props["debug.oculus.cpuLevel"])
+        assertEquals(
+            "true",
+            manifest.deviceProfiles[1].props["debug.rustyquest.makepad.mesh.replay.enabled"]
+        )
         assertEquals(1, manifest.runtimeProfiles.size)
         assertEquals("false", manifest.runtimeProfiles.first().values["rustyxr.camera"])
         assertTrue(manifest.runtimeProfiles.first().matchesTarget(manifest.apps.first()))

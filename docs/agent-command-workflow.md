@@ -189,6 +189,11 @@ adb -s <phone-serial> shell am start `
   --es extras_json '{ "rustyxr.profile": "dev-smoke", "rustyxr.feature": "true" }'
 ```
 
+`extras_json` is for Activity extras only. Generated Morphospace Makepad
+settings that target `debug.rustyquest.makepad.*` belong in a catalog device
+profile applied before launch, not in `quest-launch` extras, unless the target
+app explicitly documents a matching Activity extra.
+
 Stop a target app:
 
 ```powershell
