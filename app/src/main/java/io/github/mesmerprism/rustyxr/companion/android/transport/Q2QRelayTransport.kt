@@ -74,6 +74,7 @@ data class Q2QRelayRequest(
     val cameraId: String,
     val cameraFacing: String,
     val sameCameraToEyes: Boolean,
+    val streamMagic: String,
     val qualityProfile: String,
     val label: String
 )
@@ -205,6 +206,7 @@ class Q2QRelayTransport(
         var videoPacketCount = 0
         var codecConfigPacketCount = 0
         return try {
+            val streamMagic = Q2QStreamFraming.normalizeWriteMagic(request.streamMagic)
             val connection = connectRelay(request, "sender", sessionId, eye)
             socket = connection.socket
             val output = socket.getOutputStream()
@@ -212,12 +214,14 @@ class Q2QRelayTransport(
                 output = output,
                 width = request.width,
                 height = request.height,
+                streamMagic = streamMagic,
                 metadata = streamMetadata(
                     source = "android_phone_synthetic_mediacodec_surface",
                     sourceMode = "synthetic_surface",
                     eye = eye,
                     contentWidth = request.width,
-                    contentHeight = request.height
+                    contentHeight = request.height,
+                    streamMagic = streamMagic
                 )
             )
 
@@ -276,6 +280,7 @@ class Q2QRelayTransport(
                 declaredPacketCount = 0,
                 width = request.width,
                 height = request.height,
+                streamMagic = streamMagic,
                 durationMs = elapsedMs(startedElapsedNs),
                 error = ""
             )
@@ -343,6 +348,7 @@ class Q2QRelayTransport(
                 }
             )
 
+            val streamMagic = Q2QStreamFraming.normalizeWriteMagic(request.streamMagic)
             for (lane in laneStates) {
                 val connection = connectRelay(request, "sender", sessionId, lane.eye)
                 lane.socket = connection.socket
@@ -352,6 +358,7 @@ class Q2QRelayTransport(
                     output = lane.output!!,
                     width = selection.size.width,
                     height = selection.size.height,
+                    streamMagic = streamMagic,
                     metadata = streamMetadata(
                         source = "android_phone_camera2_mediacodec_surface",
                         sourceMode = SourceModeCamera2,
@@ -361,7 +368,8 @@ class Q2QRelayTransport(
                         cameraId = selection.cameraId,
                         lensFacing = selection.lensFacing,
                         selectedReason = selection.selectedReason,
-                        duplicatedCameraToEyes = laneStates.size > 1
+                        duplicatedCameraToEyes = laneStates.size > 1,
+                        streamMagic = streamMagic
                     )
                 )
             }
@@ -435,6 +443,7 @@ class Q2QRelayTransport(
                     declaredPacketCount = 0,
                     width = selection.size.width,
                     height = selection.size.height,
+                    streamMagic = streamMagic,
                     durationMs = elapsedMs(startedElapsedNs),
                     error = ""
                 )
@@ -498,6 +507,7 @@ class Q2QRelayTransport(
                     put("sessionId", sessionId)
                     put("width", width)
                     put("height", height)
+                    put("streamMagic", header.magic)
                     put("declaredPacketCount", declaredPacketCount)
                 }
             )
@@ -561,6 +571,7 @@ class Q2QRelayTransport(
                 declaredPacketCount = declaredPacketCount,
                 width = width,
                 height = height,
+                streamMagic = header.magic,
                 durationMs = elapsedMs(startedElapsedNs),
                 error = ""
             )
@@ -641,6 +652,7 @@ class Q2QRelayTransport(
                             put("sessionId", sessionId)
                             put("width", header.width)
                             put("height", header.height)
+                            put("streamMagic", header.magic)
                         }
                     )
                 }
@@ -661,6 +673,7 @@ class Q2QRelayTransport(
                 declaredPacketCount = header.packetCount,
                 width = header.width,
                 height = header.height,
+                streamMagic = header.magic,
                 durationMs = elapsedMs(startedElapsedNs),
                 error = ""
             )
@@ -738,9 +751,15 @@ class Q2QRelayTransport(
         return context.socketFactory
     }
 
-    private fun writeStreamHeader(output: OutputStream, width: Int, height: Int, metadata: JSONObject): Long {
+    private fun writeStreamHeader(
+        output: OutputStream,
+        width: Int,
+        height: Int,
+        streamMagic: String,
+        metadata: JSONObject
+    ): Long {
         val metadataBytes = metadata.toString().toByteArray(StandardCharsets.UTF_8)
-        output.write(StreamMagic.toByteArray(StandardCharsets.US_ASCII))
+        output.write(streamMagic.toByteArray(StandardCharsets.US_ASCII))
         writeU32(output, StreamSchemaVersion)
         writeU32(output, CodecH264)
         writeU32(output, width)
@@ -761,7 +780,8 @@ class Q2QRelayTransport(
         cameraId: String = "",
         lensFacing: String = "",
         selectedReason: String = "",
-        duplicatedCameraToEyes: Boolean = false
+        duplicatedCameraToEyes: Boolean = false,
+        streamMagic: String = ""
     ): JSONObject = JSONObject().apply {
         put("source", source)
         put("sourceMode", sourceMode)
@@ -784,6 +804,9 @@ class Q2QRelayTransport(
         }
         if (duplicatedCameraToEyes) {
             put("duplicatedCameraToEyes", true)
+        }
+        if (streamMagic.isNotBlank()) {
+            put("streamMagic", streamMagic)
         }
     }
 
@@ -1303,7 +1326,7 @@ class Q2QRelayTransport(
         val magic = ByteArray(8)
         input.readFully(magic)
         val magicText = String(magic, StandardCharsets.US_ASCII)
-        if (magicText != StreamMagic) {
+        if (!Q2QStreamFraming.isSupportedReadMagic(magicText)) {
             error("Unexpected stream magic `$magicText`.")
         }
         val schemaVersion = input.readInt()
@@ -1322,7 +1345,7 @@ class Q2QRelayTransport(
             error("Invalid header metadata byte count $metadataBytes.")
         }
         skipFully(input, metadataBytes)
-        return StreamHeader(schemaVersion, width, height, packetCount, 32L + metadataBytes)
+        return StreamHeader(magicText, schemaVersion, width, height, packetCount, 32L + metadataBytes)
     }
 
     private fun readPacket(input: DataInputStream, schemaVersion: Int, keepPayload: Boolean = false): ReceivedPacket {
@@ -1466,6 +1489,7 @@ class Q2QRelayTransport(
     )
 
     private data class StreamHeader(
+        val magic: String,
         val schemaVersion: Int,
         val width: Int,
         val height: Int,
@@ -1483,7 +1507,6 @@ class Q2QRelayTransport(
     private companion object {
         private const val RelayHelloSchema = "rusty.xr.q2q.relay.hello.v1"
         private const val RelayAckSchema = "rusty.xr.q2q.relay.ack.v1"
-        private const val StreamMagic = "RXYRVID1"
         private const val StreamSchemaVersion = 3
         private const val CodecH264 = 1
         private const val MimeH264 = "video/avc"
@@ -1524,6 +1547,7 @@ private data class Q2QLaneResult(
     val declaredPacketCount: Int,
     val width: Int,
     val height: Int,
+    val streamMagic: String,
     val durationMs: Long,
     val error: String
 ) {
@@ -1542,6 +1566,9 @@ private data class Q2QLaneResult(
         put("declaredPacketCount", declaredPacketCount)
         put("width", width)
         put("height", height)
+        if (streamMagic.isNotBlank()) {
+            put("streamMagic", streamMagic)
+        }
         put("durationMs", durationMs)
         if (error.isNotBlank()) {
             put("error", error)
@@ -1561,7 +1588,8 @@ private data class Q2QLaneResult(
             codecConfigPacketCount: Int = 0,
             declaredPacketCount: Int = 0,
             width: Int = 0,
-            height: Int = 0
+            height: Int = 0,
+            streamMagic: String = ""
         ): Q2QLaneResult = Q2QLaneResult(
             role = role,
             eye = eye,
@@ -1576,6 +1604,7 @@ private data class Q2QLaneResult(
             declaredPacketCount = declaredPacketCount,
             width = width,
             height = height,
+            streamMagic = streamMagic,
             durationMs = durationMs,
             error = error
         )

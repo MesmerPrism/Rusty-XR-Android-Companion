@@ -67,6 +67,9 @@ param(
 
     [switch] $SeparateCameraPerEye,
 
+    [ValidateSet("legacy", "manifold", "RXYRVID1", "RMANVID1")]
+    [string] $StreamMagic = "legacy",
+
     [switch] $DisplayReceiver,
 
     [ValidateSet("left", "right", "mono")]
@@ -105,6 +108,7 @@ $args = @(
     "--ei", "frame_rate_hz", "$FrameRateHz",
     "--es", "camera_facing", $CameraFacing,
     "--ez", "same_camera_to_eyes", "$(-not $SeparateCameraPerEye)".ToLowerInvariant(),
+    "--es", "stream_magic", $StreamMagic,
     "--ez", "display_receiver", "$([bool] $DisplayReceiver)".ToLowerInvariant(),
     "--es", "display_eye", $DisplayEye,
     "--ez", "allow_dev_session", "$([bool] $AllowDevSession)".ToLowerInvariant()

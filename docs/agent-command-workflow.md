@@ -66,9 +66,11 @@ instability that does not affect the individual workflow steps.
   report decoded frame/sample counts.
 - `q2q-relay`: run a bounded phone-native Rusty XR Q2Q relay test as sender,
   receiver, or duplex. The sender path emits synthetic or Camera2 H.264
-  `RXYRVID1` packets from Android `MediaCodec`; the receiver path validates
-  and counts incoming `RXYRVID1` H.264 packets and can optionally render one
-  receiver lane to a phone surface.
+  packets from Android `MediaCodec`; it defaults to legacy `RXYRVID1` framing
+  and can emit Manifold `RMANVID1` framing with `stream_magic=manifold`. The
+  receiver path validates and counts incoming `RMANVID1` or legacy `RXYRVID1`
+  H.264 packets and can optionally render one receiver lane to a phone
+  surface.
 - `quest-suite`: connect to the Quest, wake it, optionally
   install/launch/query/stop a target app, send home/back, then run non-critical
   package inventory and OSC UDP probes.
@@ -138,6 +140,7 @@ adb -s <phone-serial> shell am start `
   --es send_session_id <phone-camera-session> `
   --es eyes left,right `
   --es source_mode camera2_surface `
+  --es stream_magic manifold `
   --es quality_profile camera-native-max `
   --ei bitrate_bps 20000000 `
   --ei frame_rate_hz 60 `

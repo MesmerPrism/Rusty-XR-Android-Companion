@@ -134,6 +134,7 @@ class AgentCommandRunner(
             cameraId = intent.getStringExtra(ExtraCameraId)?.trim().orEmpty(),
             cameraFacing = intent.getStringExtra(ExtraCameraFacing)?.trim().orEmpty(),
             sameCameraToEyes = intent.getBooleanExtra(ExtraSameCameraToEyes, true),
+            streamMagic = intent.getStringExtra(ExtraStreamMagic)?.trim().orEmpty(),
             qualityProfile = intent.getStringExtra(ExtraQualityProfile)?.trim().orEmpty(),
             label = intent.getStringExtra(ExtraLabel)?.trim().orEmpty()
         )
@@ -154,6 +155,7 @@ class AgentCommandRunner(
                 put("height", request.height)
                 put("frameRateHz", request.frameRateHz)
                 put("bitrateBps", request.bitrateBps)
+                put("streamMagic", request.streamMagic.ifBlank { "legacy" })
             }
         )
         val q2q = Q2QRelayTransport(
@@ -540,6 +542,7 @@ class AgentCommandRunner(
         const val ExtraCameraId = "camera_id"
         const val ExtraCameraFacing = "camera_facing"
         const val ExtraSameCameraToEyes = "same_camera_to_eyes"
+        const val ExtraStreamMagic = "stream_magic"
         const val ExtraDisplayReceiver = "display_receiver"
         const val ExtraDisplayEye = "display_eye"
         const val ExtraLabel = "label"
