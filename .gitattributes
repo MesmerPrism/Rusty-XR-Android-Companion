@@ -1,0 +1,80 @@
+# Normalize text files to LF by default. Windows command wrappers are explicit exceptions.
+* text=auto eol=lf
+
+# Rust and common source files
+*.rs text eol=lf diff=rust
+*.toml text eol=lf diff=toml
+Cargo.lock text eol=lf
+*.cs text eol=lf diff=csharp
+*.csproj text eol=lf
+*.sln text eol=lf
+*.slnx text eol=lf
+*.java text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.gradle text eol=lf
+gradlew text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.wasm binary
+
+# Scripts
+*.ps1 text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Data and docs
+*.md text eol=lf diff=markdown
+*.mdx text eol=lf diff=markdown
+*.txt text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.sql text eol=lf
+
+# Shaders
+*.glsl text eol=lf
+*.vert text eol=lf
+*.frag text eol=lf
+*.comp text eol=lf
+*.wgsl text eol=lf
+
+# Binary assets and archives
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.tar binary
+*.tgz binary
+*.zst binary
+*.apk binary
+*.aab binary
+*.dll binary
+*.exe binary
+*.so binary
+*.dylib binary
+
+# Preserve patch payload line endings.
+*.patch -text
+
+.gitattributes text eol=lf
+.gitignore text eol=lf
